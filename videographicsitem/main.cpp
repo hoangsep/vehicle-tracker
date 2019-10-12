@@ -50,6 +50,8 @@
 //#define CV_DNN_DONT_ADD_INLINE_NS
 
 #include "videoplayer.h"
+#include "vehicle_tracker.h"
+
 #include <string.h>
 #include <QApplication>
 #include <QCommandLineParser>
@@ -61,6 +63,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/dnn.hpp>
+#include <opencv2/videoio.hpp>
 
 #include <dlib/image_processing.h>
 #include <dlib/gui_widgets.h>
@@ -89,7 +92,6 @@ int main(int argc, char **argv)
     std::string model = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.caffemodel";
     cv::dnn::Net net = cv::dnn::readNetFromCaffe(prototxt, model);
 //    print("[INFO] starting video stream...");
-//    vs = cv2.VideoCapture(args["video"]);
 
     VideoPlayer player;
 

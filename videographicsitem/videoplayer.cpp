@@ -53,18 +53,27 @@
 #include <QtWidgets>
 #include <QGraphicsVideoItem>
 
+#include <iostream>
+
 VideoPlayer::VideoPlayer(QWidget *parent)
     : QWidget(parent)
 {
     m_mediaPlayer = new QMediaPlayer(this, QMediaPlayer::VideoSurface);
+    m_processedMediaPlayer = new QMediaPlayer(this, QMediaPlayer::VideoSurface);
+
     const QRect screenGeometry = QApplication::desktop()->screenGeometry(this);
     m_videoItem = new QGraphicsVideoItem;
+    m_processedVideoItem = new QGraphicsVideoItem;
+
     m_videoItem->setSize(QSizeF(screenGeometry.width() / 3, screenGeometry.height() / 2));
+    m_processedVideoItem->setSize(QSizeF(screenGeometry.width() / 3, screenGeometry.height() / 2));
 
     QGraphicsScene *scene = new QGraphicsScene(this);
-    QGraphicsView *graphicsView = new QGraphicsView(scene);
-
+    QGraphicsScene *pScene = new QGraphicsScene(this);
     scene->addItem(m_videoItem);
+    pScene->addItem(m_processedVideoItem);
+    QGraphicsView *graphicsView = new QGraphicsView(scene);
+    QGraphicsView *pGraphicsView = new QGraphicsView(pScene);
 
     QSlider *rotateSlider = new QSlider(Qt::Horizontal);
     rotateSlider->setToolTip(tr("Rotate Video"));
@@ -97,6 +106,7 @@ VideoPlayer::VideoPlayer(QWidget *parent)
 
     QBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(graphicsView);
+    layout->addWidget(pGraphicsView);
     layout->addWidget(rotateSlider);
     layout->addLayout(controlLayout);
 
@@ -105,6 +115,11 @@ VideoPlayer::VideoPlayer(QWidget *parent)
             this, &VideoPlayer::mediaStateChanged);
     connect(m_mediaPlayer, &QMediaPlayer::positionChanged, this, &VideoPlayer::positionChanged);
     connect(m_mediaPlayer, &QMediaPlayer::durationChanged, this, &VideoPlayer::durationChanged);
+
+//    m_videoCapture = new cv::VideoCapture();
+    m_vehicleTracker = new VehicleTracker();
+    m_processedMediaPlayer->setVideoOutput(m_processedVideoItem);
+//    m_processedMediaPlayer->setVideoOutput(m_vehicleTracker);
 }
 
 VideoPlayer::~VideoPlayer()
@@ -131,25 +146,38 @@ void VideoPlayer::openFile()
         fileDialog.setMimeTypeFilters(supportedMimeTypes);
     fileDialog.setDirectory(QStandardPaths::standardLocations(QStandardPaths::MoviesLocation).value(0, QDir::homePath()));
     if (fileDialog.exec() == QDialog::Accepted) {
-//        qDebug() << fileDialog.selectedUrls().constFirst().url();
+        qDebug() << fileDialog.selectedUrls().constFirst().url();
         load(fileDialog.selectedUrls().constFirst());
     }
 }
 
-void VideoPlayer::load(const QUrl &url)
-{
+void VideoPlayer::load(const QUrl &url) {
+    // TODO: Add check to see if open successful or not
+//    vs.open(url.toString().toUtf8().constData());
+    // Check if camera opened successfully
+//    if(!vs.isOpened()){
+//        std::cout << "Error opening video stream or file" << std::endl;
+//    }
+//    else {
+//        std::cout << "file opened" << std::endl;
+//    }
     m_mediaPlayer->setMedia(url);
+    m_processedMediaPlayer->setMedia(url);
     m_playButton->setEnabled(true);
 }
 
-void VideoPlayer::play()
-{
+void VideoPlayer::play() {
     switch (m_mediaPlayer->state()) {
     case QMediaPlayer::PlayingState:
         m_mediaPlayer->pause();
+        m_processedMediaPlayer->pause();
         break;
     default:
         m_mediaPlayer->play();
+        m_processedMediaPlayer->play();
+//        cv::Mat image;
+//        vs.read(image);
+
         break;
     }
 }

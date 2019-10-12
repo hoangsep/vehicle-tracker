@@ -3,7 +3,10 @@ TARGET = videographicsitem
 
 QT += multimedia multimediawidgets
 
-HEADERS   += videoplayer.h
+HEADERS   += videoplayer.h \
+    MyVideoFilter.h \
+    MyVideoFilterRunnable.h \
+    vehicle_tracker.h
 
 INCLUDEPATH += /usr/local/include/opencv4
 LIBS += $(shell pkg-config opencv --libs)
@@ -13,6 +16,9 @@ QMAKE_CXXFLAGS += -std=c++11
 PKGCONFIG += dlib-1
 
 SOURCES   += main.cpp \
+             MyVideoFilter.cpp \
+             MyVideoFilterRunnable.cpp \
+             vehicle_tracker.cpp \
              videoplayer.cpp
 
 target.path = $$[QT_INSTALL_EXAMPLES]/multimediawidgets/videographicsitem
@@ -23,4 +29,7 @@ QT+=widgets
 DISTFILES += \
     mobilenet_ssd/MobileNetSSD_deploy.caffemodel \
     mobilenet_ssd/MobileNetSSD_deploy.prototxt
+
+RESOURCES += \
+    qml.qrc
 

@@ -53,6 +53,8 @@
 
 #include <QMediaPlayer>
 #include <QWidget>
+#include <opencv2/videoio.hpp>
+#include "vehicle_tracker.h"
 
 QT_BEGIN_NAMESPACE
 class QAbstractButton;
@@ -86,9 +88,14 @@ private slots:
 
 private:
     QMediaPlayer *m_mediaPlayer = nullptr;
+    QMediaPlayer *m_processedMediaPlayer = nullptr;
     QGraphicsVideoItem *m_videoItem = nullptr;
+    QGraphicsVideoItem *m_processedVideoItem = nullptr;
     QAbstractButton *m_playButton = nullptr;
     QSlider *m_positionSlider = nullptr;
+
+//    cv::VideoCapture *m_videoCapture;
+    VehicleTracker *m_vehicleTracker;
 };
 
 #endif
