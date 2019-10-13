@@ -51,11 +51,13 @@
 
 #include "videoplayer.h"
 #include "vehicle_tracker.h"
+#include "MyVideoFilter.h"
 
 #include <string.h>
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QCommandLineOption>
+#include <QQmlApplicationEngine>
 #include <QDir>
 
 //#include <opencv2/opencv.hpp>
@@ -75,34 +77,36 @@ using namespace dnn;
 
 int main(int argc, char **argv)
 {
-    QApplication app(argc, argv);
+//    QApplication app(argc, argv);
 
-    QCoreApplication::setApplicationName("Vehicle Tracker");
-    QCoreApplication::setOrganizationName("QtProject");
-    QCoreApplication::setApplicationVersion(QT_VERSION_STR);
-    QCommandLineParser parser;
-    parser.setApplicationDescription("Hakuna matata");
-    parser.addHelpOption();
-    parser.addVersionOption();
-    parser.addPositionalArgument("url", "The URL to open.");
-    parser.process(app);
-    dlib::correlation_tracker tracker;
-//    printf("[INFO] loading model...");
-    std::string prototxt = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.prototxt";
-    std::string model = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.caffemodel";
-    cv::dnn::Net net = cv::dnn::readNetFromCaffe(prototxt, model);
-//    print("[INFO] starting video stream...");
+//    QCoreApplication::setApplicationName("Vehicle Tracker");
+//    QCoreApplication::setOrganizationName("QtProject");
+//    QCoreApplication::setApplicationVersion(QT_VERSION_STR);
+//    QCommandLineParser parser;
+//    parser.setApplicationDescription("Hakuna matata");
+//    parser.addHelpOption();
+//    parser.addVersionOption();
+//    parser.addPositionalArgument("url", "The URL to open.");
+//    parser.process(app);
+//    dlib::correlation_tracker tracker;
 
-    VideoPlayer player;
+//    VideoPlayer player;
 
-    if (!parser.positionalArguments().isEmpty() && player.isPlayerAvailable()) {
-        const QUrl url =
-            QUrl::fromUserInput(parser.positionalArguments().constFirst(),
-                                QDir::currentPath(), QUrl::AssumeLocalFile);
-        player.load(url);
-    }
+//    if (!parser.positionalArguments().isEmpty() && player.isPlayerAvailable()) {
+//        const QUrl url =
+//            QUrl::fromUserInput(parser.positionalArguments().constFirst(),
+//                                QDir::currentPath(), QUrl::AssumeLocalFile);
+//        player.load(url);
+//    }
 
-    player.show();
+//    player.show();
+
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    QGuiApplication app(argc, argv);
+
+    QQmlApplicationEngine engine;
+    qmlRegisterType<MyVideoFilter>("MyVideoFilterLib", 1, 0, "MyVideoFilter");
+    engine.load(QUrl(QLatin1String("qrc:/main.qml")));
 
     return app.exec();
 }

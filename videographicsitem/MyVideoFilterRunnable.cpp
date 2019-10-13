@@ -14,52 +14,34 @@ MyVideoFilterRunnable::MyVideoFilterRunnable(MyVideoFilter* parent) :
     m_Orientation(0),
     m_Flip(0)
 {
+    std::string prototxt = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.prototxt";
+    std::string model = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.caffemodel";
+    net = cv::dnn::readNetFromCaffe(prototxt, model);
 }
 
-QVideoFrame MyVideoFilterRunnable::run(QVideoFrame *input, const QVideoSurfaceFormat &surfaceFormat, RunFlags flags)
-{
+QVideoFrame MyVideoFilterRunnable::run(QVideoFrame *input, const QVideoSurfaceFormat &surfaceFormat, RunFlags flags) {
     Q_UNUSED(flags)
 
-    if (!input->isValid())
-    {
+    if (!input->isValid()) {
         qWarning("Invalid input format");
         return *input;
     }
 
-    static qint64 lastDraw = 0;
-
-    if (QDateTime::currentDateTime().currentMSecsSinceEpoch() < lastDraw + 3000)
-    {
-    }
-    else if (QDateTime::currentDateTime().currentMSecsSinceEpoch() < lastDraw + 6000)
-    {
-        return *input;
-    }
-    else
-    {
-        lastDraw = QDateTime::currentDateTime().currentMSecsSinceEpoch();
-    }
-
     m_Orientation = m_Filter ? m_Filter->property("orientation").toInt() : 0;
 
-#ifdef Q_OS_ANDROID
-    m_Flip = true;
-#else
     m_Flip = surfaceFormat.scanLineDirection() == QVideoSurfaceFormat::BottomToTop;
-#endif
 
     QImage image = QVideoFrameToQImage(input);
-    if (image.isNull())
-    {
+    if (image.isNull()) {
         return *input;
     }
 
-    if (image.format() != QImage::Format_ARGB32)
-    {
+    if (image.format() != QImage::Format_ARGB32) {
         image = image.convertToFormat(QImage::Format_ARGB32);
     }
 
     drawRedGreenPixels(image);
+    drawTrackingInfo(image);
 
     return QVideoFrame(image);
 }
@@ -107,18 +89,15 @@ QImage MyVideoFilterRunnable::QVideoFrameToQImage_using_GLTextureHandle(QVideoFr
     return image;
 }
 
-void MyVideoFilterRunnable::drawRedGreenPixels(QImage& image)
-{
+void MyVideoFilterRunnable::drawRedGreenPixels(QImage& image) {
     auto bits = image.bits();
     int bytesPerLine = image.bytesPerLine();
     auto bytesPerPixel = bytesPerLine / image.width();
-    for (int y = 0; y < image.height() && y < 32; y++)
-    {
+    for (int y = 0; y < image.height() && y < 32; y++) {
         unsigned char* line = bits + y * bytesPerLine;
         auto leftPixel = line;
         auto rightPixel = line + bytesPerLine - bytesPerPixel;
-        for (int x = 0; x < image.width() && x < 32; x++)
-        {
+        for (int x = 0; x < image.width() && x < 32; x++) {
             leftPixel[0] = 0;
             leftPixel[1] = 255;
             leftPixel[2] = 0;
@@ -129,4 +108,13 @@ void MyVideoFilterRunnable::drawRedGreenPixels(QImage& image)
             rightPixel -= bytesPerPixel;
         }
     }
+}
+
+void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
+    auto bits = image.bits();
+    int bytesPerLine = image.bytesPerLine();
+    auto bytesPerPixel = bytesPerLine / image.width();
+
+
+
 }

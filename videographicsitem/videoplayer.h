@@ -55,6 +55,7 @@
 #include <QWidget>
 #include <opencv2/videoio.hpp>
 #include "vehicle_tracker.h"
+#include "MyVideoFilter.h"
 
 QT_BEGIN_NAMESPACE
 class QAbstractButton;

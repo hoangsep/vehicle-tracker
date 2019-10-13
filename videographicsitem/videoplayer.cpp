@@ -118,8 +118,8 @@ VideoPlayer::VideoPlayer(QWidget *parent)
 
 //    m_videoCapture = new cv::VideoCapture();
     m_vehicleTracker = new VehicleTracker();
-    m_processedMediaPlayer->setVideoOutput(m_processedVideoItem);
-//    m_processedMediaPlayer->setVideoOutput(m_vehicleTracker);
+//    m_processedMediaPlayer->setVideoOutput(m_processedVideoItem);
+    m_processedMediaPlayer->setVideoOutput(m_vehicleTracker);
 }
 
 VideoPlayer::~VideoPlayer()

@@ -26,6 +26,39 @@ class VehicleTracker : public QAbstractVideoSurface {
         Q_UNUSED(frame)
         // Handle the frame and do your processing
         std::cout << "frame received" << std::endl;
+//        if (notMyFormat(frame.pixelFormat())) {
+//            setError(IncorrectFormatError);
+//            return false;
+//        } else {
+
+//            QVideoFrame frametodraw(frame);
+
+//            if(!frametodraw.map(QAbstractVideoBuffer::ReadOnly))
+//            {
+//               setError(ResourceError);
+//               return false;
+//            }
+
+//             //this is a shallow operation. it just refer the frame buffer
+//             QImage image(
+//                    frametodraw.bits(),
+//                    frametodraw.width(),
+//                    frametodraw.height(),
+//                    frametodraw.bytesPerLine(),
+//                    QImage::Format_RGB444);
+
+//            mylabel->resize(image.size());
+
+//            //QPixmap::fromImage create a new buffer for the pixmap
+//            mylabel->setPixmap(QPixmap::fromImage(image));
+
+//            //we can release the data
+//            frametodraw.unmap();
+
+//            mylabel->update();
+
+            return true;
+//        }
         return true;
     }
 };

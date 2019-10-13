@@ -1,7 +1,7 @@
 TEMPLATE = app
 TARGET = videographicsitem
 
-QT += multimedia multimediawidgets
+QT += qml quick multimedia multimediawidgets
 
 HEADERS   += videoplayer.h \
     MyVideoFilter.h \
