@@ -3,6 +3,7 @@
 
 #include <QVideoFilterRunnable>
 #include <QVideoFrame>
+#include <QPainter>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
@@ -13,6 +14,13 @@
 #include <dlib/gui_widgets.h>
 #include <dlib/image_io.h>
 #include <dlib/dir_nav.h>
+
+// initialize the list of class labels MobileNet SSD was trained to
+// detect
+static std::string CLASSES[] = {"background", "aeroplane", "bicycle", "bird", "boat",
+    "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
+    "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
+    "sofa", "train", "tvmonitor"};
 
 class MyVideoFilter;
 

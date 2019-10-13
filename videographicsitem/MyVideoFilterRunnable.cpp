@@ -41,7 +41,7 @@ QVideoFrame MyVideoFilterRunnable::run(QVideoFrame *input, const QVideoSurfaceFo
         image = image.convertToFormat(QImage::Format_ARGB32);
     }
 
-    drawRedGreenPixels(image);
+//    drawRedGreenPixels(image);
     drawTrackingInfo(image);
 
     return QVideoFrame(image);
@@ -117,22 +117,59 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
     auto bytesPerPixel = bytesPerLine / image.width();
 
 //    cv::Mat frame(image.height(),image.width(),CV_8UC3, image.bits(), image.bytesPerLine());
-    std::cout << image.format() << std::endl;
-    cv::Mat frame;
-//    QImageToCvMat(image, frame);
-    frame = QImageToCvMat(image);
+    cv::Mat frame = QImageToCvMat(image);
     cv::Mat bgr;
-    cv::cvtColor(frame, bgr, cv::COLOR_RGBA2RGB);
+    cv::cvtColor(frame, bgr, cv::COLOR_RGBA2BGR);
 //    frame = imutils.resize(frame, width=600)
     // frame from BGR to RGB ordering (dlib needs RGB ordering)
     cv::Mat rgb;
     cv::cvtColor(frame, rgb, cv::COLOR_RGBA2RGB);
-//    cv::Mat blob = cv::dnn::blobFromImage(mat);
-    cv::Mat blob;
-    cv::dnn::blobFromImage(bgr, blob);
+
+//    std::cout << bgr.size << std::endl;
+    cv::Mat blob = cv::dnn::blobFromImage(bgr, 0.003922, cv::Size(bgr.size[1], bgr.size[0]), cv::Scalar(104, 117, 123), false);
+//    std::cout << blob.size << std::endl;
     net.setInput(blob);
-    cv::Mat detections = net.forward("detection_out");
-    std::cout << detections.size << std::endl;
+    cv::Mat detections = net.forward();
+    cv::Mat dec(detections.size[2], detections.size[3], CV_32F, detections.ptr<float>());
+//    std::cout << detections.size << std::endl;  // It is 1x1xnx7
+//    std::cout << dec.size << std::endl;  // It is nx7
+//    std::cout << detections.at<cv::Vec2f>(0, 0) << std::endl;
+//    std::cout << dec << std::endl;
+    for (int i = 0; i < dec.size[0]; i++) {
+        float confidence = dec.at<float>(i, 2);
+//        if (confidence != 0) std::cout << confidence << std::endl;
+
+        // filter out weak detections by requiring a minimum
+        // confidence
+        if (confidence > 0.2) {
+            // extract the index of the class label from the
+            // detections list
+            int idx = int(detections.at<float>(i, 1));
+            std::string label = CLASSES[idx];
+            std::cout << label << ":" << confidence << std::endl;
+
+            // if the class label is not a person, ignore it
+            if (label != "car")
+                continue;
+            std::cout << "car detected" << std::endl;
+
+            // compute the (x, y)-coordinates of the bounding box for the object
+            int x_start = int(detections.at<float>(i, 3) * image.width());
+            int y_start = int(detections.at<float>(i, 4) * image.height());
+            int x_end = int(detections.at<float>(i, 5) * image.width());
+            int y_end = int(detections.at<float>(i, 6) * image.height());
+
+//            std::cout << x_start << ":" << x_end << "_" << y_start << ":" << y_end << std::endl;
+
+            QPainter qPainter(&image);
+            qPainter.setBrush(Qt::NoBrush);
+            qPainter.setPen(Qt::red);
+            qPainter.drawRect(x_start, y_start, x_end - x_start, y_end - y_start);
+            qPainter.end();
+//            ui.imageLabel->setPixmap(QPixmap::fromImage(image));
+        }
+
+    }
 //    std::cout << detections.at(0, 0) << std::endl;
 }
 
