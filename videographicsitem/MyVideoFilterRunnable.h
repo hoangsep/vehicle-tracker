@@ -26,7 +26,9 @@ public:
     static QImage QVideoFrameToQImage_using_Qt_internals(QVideoFrame* input);
     static QImage QVideoFrameToQImage_using_GLTextureHandle(QVideoFrame* input);
     static void drawRedGreenPixels(QImage& image);
-    static void drawTrackingInfo(QImage& image);
+    void drawTrackingInfo(QImage& image);
+    cv::Mat QImageToCvMat( const QImage &inImage, bool inCloneImageData = true);
+//    void QImageToCvMat(const QImage& image, cv::OutputArray out);
 
 protected:
     MyVideoFilter* m_Filter;

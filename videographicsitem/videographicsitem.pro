@@ -10,8 +10,9 @@ HEADERS   += videoplayer.h \
 
 INCLUDEPATH += /usr/local/include/opencv4
 LIBS += $(shell pkg-config opencv --libs)
-LIBS += -lopencv_dnn
-#LIBS += -L /usr/local/lib -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_videoio -lopencv_imgcodecs -ldlib  -lopencv_dnn
+#LIBS += -lopencv_dnn
+LIBS += -L /usr/local/lib -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_videoio -lopencv_imgcodecs -ldlib  -lopencv_dnn
+
 QMAKE_CXXFLAGS += -std=c++11
 PKGCONFIG += dlib-1
 
