@@ -14,6 +14,7 @@
 #include <dlib/gui_widgets.h>
 #include <dlib/image_io.h>
 #include <dlib/dir_nav.h>
+#include <dlib/opencv/cv_image.h>
 
 // initialize the list of class labels MobileNet SSD was trained to
 // detect
@@ -21,6 +22,7 @@ static std::string CLASSES[] = {"background", "aeroplane", "bicycle", "bird", "b
     "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
     "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
     "sofa", "train", "tvmonitor"};
+const float confidenceThreshold = 0.3f;
 
 class MyVideoFilter;
 
@@ -36,16 +38,15 @@ public:
     static void drawRedGreenPixels(QImage& image);
     void drawTrackingInfo(QImage& image);
     cv::Mat QImageToCvMat( const QImage &inImage, bool inCloneImageData = true);
-//    void QImageToCvMat(const QImage& image, cv::OutputArray out);
 
 protected:
     MyVideoFilter* m_Filter;
     int m_Orientation;
     int m_Flip;
-    dlib::correlation_tracker tracker;
-//    printf("[INFO] loading model...");
-    cv::dnn::Net net;
-//    print("[INFO] starting video stream...");
+    std::vector<dlib::correlation_tracker> m_trackers;
+    std::vector<std::string> m_labels;
+    cv::dnn::Net m_net;
+    unsigned long m_frameCount;
 };
 
 #endif

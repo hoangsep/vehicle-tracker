@@ -12,11 +12,12 @@ QImage qt_imageFromVideoFrame(const QVideoFrame& f);
 MyVideoFilterRunnable::MyVideoFilterRunnable(MyVideoFilter* parent) :
     m_Filter(parent),
     m_Orientation(0),
-    m_Flip(0)
+    m_Flip(0),
+    m_frameCount(0)
 {
     std::string prototxt = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.prototxt";
     std::string model = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.caffemodel";
-    net = cv::dnn::readNetFromCaffe(prototxt, model);
+    m_net = cv::dnn::readNetFromCaffe(prototxt, model);
     std::cout << "Read net done" << std::endl;
 }
 
@@ -27,6 +28,8 @@ QVideoFrame MyVideoFilterRunnable::run(QVideoFrame *input, const QVideoSurfaceFo
         qWarning("Invalid input format");
         return *input;
     }
+
+    m_frameCount++;
 
     m_Orientation = m_Filter ? m_Filter->property("orientation").toInt() : 0;
 
@@ -120,56 +123,88 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
     cv::Mat frame = QImageToCvMat(image);
     cv::Mat bgr;
     cv::cvtColor(frame, bgr, cv::COLOR_RGBA2BGR);
-//    frame = imutils.resize(frame, width=600)
+    dlib::array2d<dlib::bgr_pixel> dlibImage;
+    dlib::assign_image(dlibImage, dlib::cv_image<dlib::bgr_pixel>(bgr));
+
     // frame from BGR to RGB ordering (dlib needs RGB ordering)
     cv::Mat rgb;
     cv::cvtColor(frame, rgb, cv::COLOR_RGBA2RGB);
-
-//    std::cout << bgr.size << std::endl;
-//    cv::Mat resized_bgr;
-//    cv::resize(bgr, bgr, cv::Size(), 0.75, 0.75);
-    cv::Mat blob = cv::dnn::blobFromImage(bgr, 2.0 / 255, cv::Size(bgr.size[1], bgr.size[0]), cv::Scalar(127.5, 127.5, 127.5), false);
-    std::cout << blob.size << std::endl;
-    net.setInput(blob);
-    cv::Mat detections = net.forward();
-    cv::Mat dec(detections.size[2], detections.size[3], CV_32F, detections.ptr<float>());
-//    std::cout << dec << std::endl;
     QPainter qPainter(&image);
     qPainter.setBrush(Qt::NoBrush);
     qPainter.setPen(Qt::red);
-    float confidence;
-    std::string label;
-    int idx;
-    int x_start, x_end, y_start, y_end;
-    for (int i = 0; i < dec.size[0]; i++) {
-        confidence = dec.at<float>(i, 2);
-        // filter out weak detections by requiring a minimum
-        // confidence
-        if (confidence > 0.2) {
-            // extract the index of the class label from the
-            // detections list
-            idx = int(detections.at<float>(i, 1));
-            if (idx < 0) continue;
-            label = CLASSES[idx];
-//            std::cout << idx << ":" << label << ":" << confidence << std::endl;
+    int xStart, xEnd, yStart, yEnd;
+    if (m_frameCount % 5 == 0) {
+        //    cv::resize(bgr, bgr, cv::Size(), 0.75, 0.75);
+        cv::Mat blob = cv::dnn::blobFromImage(bgr, 2.0 / 255, cv::Size(bgr.size[1], bgr.size[0]), cv::Scalar(127.5, 127.5, 127.5), false);
+        m_net.setInput(blob);
+        cv::Mat detections = m_net.forward();
+        cv::Mat dec(detections.size[2], detections.size[3], CV_32F, detections.ptr<float>());
+        float confidence;
+        std::string label;
+        int idx;
 
-            // if the class label is not a person, ignore it
-            if (label != "car" && label != "bus" && label != "boat") continue;
-//            std::cout << "car detected" << std::endl;
+        for (int i = 0; i < dec.size[0]; i++) {
+            confidence = dec.at<float>(i, 2);
+            // filter out weak detections by requiring a minimum confidence
+            if (confidence > confidenceThreshold) {
+                // extract the index of the class label from the detections list
+                idx = int(detections.at<float>(i, 1));
+                if (idx < 0) continue;
+                label = CLASSES[idx];
+//                std::cout << idx << ":" << label << ":" << confidence << std::endl;
 
-            // compute the (x, y)-coordinates of the bounding box for the object
-            x_start = int(detections.at<float>(i, 3) * image.width());
-            y_start = int(detections.at<float>(i, 4) * image.height());
-            x_end = int(detections.at<float>(i, 5) * image.width());
-            y_end = int(detections.at<float>(i, 6) * image.height());
+                if (label != "car" && label != "bus") continue;
+                // compute the (x, y)-coordinates of the bounding box for the object
+                xStart = int(detections.at<float>(i, 3) * image.width());
+                yStart = int(detections.at<float>(i, 4) * image.height());
+                xEnd = int(detections.at<float>(i, 5) * image.width());
+                yEnd = int(detections.at<float>(i, 6) * image.height());
 
-//            if (idx < 0)
-//                std::cout << x_start << ":" << x_end << "-" << y_start << ":" << y_end << std::endl;
+    //            std::cout << xStart << ":" << xEnd << "-" << yStart << ":" << yEnd << std::endl;
 
-            qPainter.drawRect(x_start, y_start, x_end - x_start, y_end - y_start);
-            qPainter.drawText(x_start, y_start, QString::fromStdString(label));
+                // If the centre of one box is inside another box, we consider them the same
+                // object. Will using IOU give a better result? This sound like a classic
+                // problem, sure someone must have done a research about it
+                bool tracked = false;
+                dlib::rectangle pos;
+                long xMean, yMean;
+                for (auto tracker: m_trackers) {
+                    pos = tracker.get_position();
+                    xMean = (pos.left() + pos.right()) / 2;
+                    yMean = (pos.top() + pos.bottom()) / 2;
+                    if (xStart < xMean && xMean < xEnd && yStart < yMean && yMean < yEnd) {
+                        tracked = true;
+                        break;
+                    }
+                    // Hmm shall we check the other way as well??
+                }
+                if (!tracked) {
+                    dlib::correlation_tracker tracker = dlib::correlation_tracker();
+                    dlib::rectangle rect = dlib::rectangle(xStart, yStart, xEnd, yEnd);
+                    tracker.start_track(dlibImage, rect);
+                    m_trackers.push_back(tracker);
+                    m_labels.push_back(std::to_string(m_trackers.size() - 1));
+                    qPainter.drawRect(xStart, yStart, xEnd - xStart, yEnd - yStart);
+                    qPainter.drawText(xStart, yStart, QString::number(m_trackers.size() - 1));
+                }
+
+            }
         }
     }
+    else {
+        for (size_t i = 0; i < m_trackers.size(); i++) {
+            m_trackers[i].update(dlibImage);
+            dlib::rectangle pos = m_trackers[i].get_position();
+            // unpack the position object
+            xStart = int(pos.left());
+            yStart = int(pos.top());
+            xEnd = int(pos.right());
+            yEnd = int(pos.bottom());
+            qPainter.drawRect(xStart, yStart, xEnd - xStart, yEnd - yStart);
+            qPainter.drawText(xStart, yStart, QString::fromStdString(m_labels[i]));
+        }
+    }
+
     qPainter.end();
 }
 
