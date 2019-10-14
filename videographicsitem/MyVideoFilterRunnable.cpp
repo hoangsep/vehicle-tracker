@@ -112,11 +112,11 @@ void MyVideoFilterRunnable::drawRedGreenPixels(QImage& image) {
 }
 
 void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
-    auto bits = image.bits();
-    int bytesPerLine = image.bytesPerLine();
-    auto bytesPerPixel = bytesPerLine / image.width();
+//    auto bits = image.bits();
+//    int bytesPerLine = image.bytesPerLine();
+//    auto bytesPerPixel = bytesPerLine / image.width();
 
-//    cv::Mat frame(image.height(),image.width(),CV_8UC3, image.bits(), image.bytesPerLine());
+//    cv::Mat frame(image.height(),image.width(),CV_8UC4, image.bits(), image.bytesPerLine());
     cv::Mat frame = QImageToCvMat(image);
     cv::Mat bgr;
     cv::cvtColor(frame, bgr, cv::COLOR_RGBA2BGR);
@@ -126,83 +126,52 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
     cv::cvtColor(frame, rgb, cv::COLOR_RGBA2RGB);
 
 //    std::cout << bgr.size << std::endl;
-    cv::Mat blob = cv::dnn::blobFromImage(bgr, 0.003922, cv::Size(bgr.size[1], bgr.size[0]), cv::Scalar(104, 117, 123), false);
-//    std::cout << blob.size << std::endl;
+//    cv::Mat resized_bgr;
+//    cv::resize(bgr, bgr, cv::Size(), 0.75, 0.75);
+    cv::Mat blob = cv::dnn::blobFromImage(bgr, 2.0 / 255, cv::Size(bgr.size[1], bgr.size[0]), cv::Scalar(127.5, 127.5, 127.5), false);
+    std::cout << blob.size << std::endl;
     net.setInput(blob);
     cv::Mat detections = net.forward();
     cv::Mat dec(detections.size[2], detections.size[3], CV_32F, detections.ptr<float>());
-//    std::cout << detections.size << std::endl;  // It is 1x1xnx7
-//    std::cout << dec.size << std::endl;  // It is nx7
-//    std::cout << detections.at<cv::Vec2f>(0, 0) << std::endl;
 //    std::cout << dec << std::endl;
+    QPainter qPainter(&image);
+    qPainter.setBrush(Qt::NoBrush);
+    qPainter.setPen(Qt::red);
+    float confidence;
+    std::string label;
+    int idx;
+    int x_start, x_end, y_start, y_end;
     for (int i = 0; i < dec.size[0]; i++) {
-        float confidence = dec.at<float>(i, 2);
-//        if (confidence != 0) std::cout << confidence << std::endl;
-
+        confidence = dec.at<float>(i, 2);
         // filter out weak detections by requiring a minimum
         // confidence
         if (confidence > 0.2) {
             // extract the index of the class label from the
             // detections list
-            int idx = int(detections.at<float>(i, 1));
-            std::string label = CLASSES[idx];
-            std::cout << label << ":" << confidence << std::endl;
+            idx = int(detections.at<float>(i, 1));
+            if (idx < 0) continue;
+            label = CLASSES[idx];
+//            std::cout << idx << ":" << label << ":" << confidence << std::endl;
 
             // if the class label is not a person, ignore it
-            if (label != "car")
-                continue;
-            std::cout << "car detected" << std::endl;
+            if (label != "car" && label != "bus" && label != "boat") continue;
+//            std::cout << "car detected" << std::endl;
 
             // compute the (x, y)-coordinates of the bounding box for the object
-            int x_start = int(detections.at<float>(i, 3) * image.width());
-            int y_start = int(detections.at<float>(i, 4) * image.height());
-            int x_end = int(detections.at<float>(i, 5) * image.width());
-            int y_end = int(detections.at<float>(i, 6) * image.height());
+            x_start = int(detections.at<float>(i, 3) * image.width());
+            y_start = int(detections.at<float>(i, 4) * image.height());
+            x_end = int(detections.at<float>(i, 5) * image.width());
+            y_end = int(detections.at<float>(i, 6) * image.height());
 
-//            std::cout << x_start << ":" << x_end << "_" << y_start << ":" << y_end << std::endl;
+//            if (idx < 0)
+//                std::cout << x_start << ":" << x_end << "-" << y_start << ":" << y_end << std::endl;
 
-            QPainter qPainter(&image);
-            qPainter.setBrush(Qt::NoBrush);
-            qPainter.setPen(Qt::red);
             qPainter.drawRect(x_start, y_start, x_end - x_start, y_end - y_start);
-            qPainter.end();
-//            ui.imageLabel->setPixmap(QPixmap::fromImage(image));
+            qPainter.drawText(x_start, y_start, QString::fromStdString(label));
         }
-
     }
-//    std::cout << detections.at(0, 0) << std::endl;
+    qPainter.end();
 }
-
-//void MyVideoFilterRunnable::QImageToCvMat(const QImage& image, cv::OutputArray out) {
-
-//    switch(image.format()) {
-//        case QImage::Format_Invalid:
-//        {
-//            cv::Mat empty;
-//            empty.copyTo(out);
-//            break;
-//        }
-//        case QImage::Format_RGB32:
-//        {
-//            cv::Mat view(image.height(),image.width(),CV_8UC4,(void *)image.constBits(),image.bytesPerLine());
-//            view.copyTo(out);
-//            break;
-//        }
-//        case QImage::Format_RGB888:
-//        {
-//            cv::Mat view(image.height(),image.width(),CV_8UC3,(void *)image.constBits(),image.bytesPerLine());
-//            cvtColor(view, out, cv::COLOR_RGB2BGR);
-//            break;
-//        }
-//        default:
-//        {
-//            QImage conv = image.convertToFormat(QImage::Format_ARGB32);
-//            cv::Mat view(conv.height(),conv.width(),CV_8UC4,(void *)conv.constBits(),conv.bytesPerLine());
-//            view.copyTo(out);
-//            break;
-//        }
-//    }
-//}
 
 cv::Mat MyVideoFilterRunnable::QImageToCvMat(const QImage &inImage, bool inCloneImageData) {
     switch (inImage.format()) {
