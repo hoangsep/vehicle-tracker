@@ -23,6 +23,19 @@ INSTALLS += target
 QT+=widgets
 
 DISTFILES += \
+    SSD_300x300/VGG_coco_SSD_300x300_iter_400000.caffemodel \
+    SSD_300x300/deploy.prototxt \
+    SSD_300x300/score_ssd_coco_minival.py \
+    SSD_300x300/score_ssd_coco_testdev.py \
+    SSD_300x300/solver.prototxt \
+    SSD_300x300/ssd_coco.py \
+    SSD_300x300/test.prototxt \
+    SSD_300x300/train.prototxt \
+    SSD_300x300_coco/VGG_coco_SSD_300x300.caffemodel \
+    SSD_300x300_coco/deploy.prototxt \
+    YOLO/coco.names \
+    YOLO/yolov3.cfg \
+    YOLO/yolov3.weights \
     mobilenet_ssd/MobileNetSSD_deploy.caffemodel \
     mobilenet_ssd/MobileNetSSD_deploy.prototxt
 

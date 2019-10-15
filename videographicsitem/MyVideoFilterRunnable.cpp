@@ -24,10 +24,24 @@ MyVideoFilterRunnable::MyVideoFilterRunnable(MyVideoFilter* parent) :
     std::string prototxt3 = "/home/mihota/vision/vehicle-tracker/videographicsitem/SSD_300x300/deploy.prototxt";
     std::string model3 = "/home/mihota/vision/vehicle-tracker/videographicsitem/SSD_300x300/VGG_coco_SSD_300x300_iter_400000.caffemodel";
 
-    m_net = cv::dnn::readNetFromCaffe(prototxt1, model1);
-    std::cout << "Read net done" << std::endl;
+//    m_net = cv::dnn::readNetFromCaffe(prototxt1, model1);
+//    std::cout << "Read net done" << std::endl;
+    // YOLO time --------------------------------------------------------------------
+    // Load names of classes
+    std::string folderName = "/home/mihota/vision/vehicle-tracker/videographicsitem/YOLO/";
+    std::string classesFile = folderName + "coco.names";
+    std::ifstream ifs(classesFile.c_str());
+    std::string line;
+    while (getline(ifs, line)) m_classes.push_back(line);
 
+    // Give the configuration and weight files for the model
+    std::string modelConfiguration = folderName + "yolov3.cfg";
+    std::string modelWeights = folderName + "yolov3.weights";
 
+    // Load the network
+    m_net = cv::dnn::readNetFromDarknet(modelConfiguration, modelWeights);
+    m_net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+    m_net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
 }
 
 QVideoFrame MyVideoFilterRunnable::run(QVideoFrame *input, const QVideoSurfaceFormat &surfaceFormat, RunFlags flags) {
@@ -54,7 +68,8 @@ QVideoFrame MyVideoFilterRunnable::run(QVideoFrame *input, const QVideoSurfaceFo
     }
 
 //    drawRedGreenPixels(image);
-    drawTrackingInfo(image);
+//    drawTrackingInfo(image);
+    drawTrackingInfoYOLO(image);
 
     return QVideoFrame(image);
 }
@@ -135,12 +150,10 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
 
     // Crop the full image to that image contained by the rectangle myROI
     cv::Mat croppedFrame = frame(myROI);
-//    frame(myROI).copyTo(croppedFrame);
     cv::Mat bgr;
     cv::cvtColor(croppedFrame, bgr, cv::COLOR_RGBA2BGR);
     dlib::array2d<dlib::bgr_pixel> dlibImage;
     dlib::assign_image(dlibImage, dlib::cv_image<dlib::bgr_pixel>(bgr));
-//    std::cout << dlibImage.size() << std::endl;
 
     // frame from BGR to RGB ordering (dlib needs RGB ordering)
     cv::Mat rgb;
@@ -152,11 +165,14 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
     qPainter.drawRect(leftCrop, 0, 1280 - rightCrop, 720);
     int xStart, xEnd, yStart, yEnd;
     if (m_frameCount % 20 == 0) {
-        //    cv::resize(bgr, bgr, cv::Size(), 0.75, 0.75);
         cv::Mat blob = cv::dnn::blobFromImage(bgr, 2.0 / 255, cv::Size(bgr.size[1], bgr.size[0]), cv::Scalar(127.5, 127.5, 127.5), false);
-        std::cout << blob.size << std::endl;
         m_net.setInput(blob);
         cv::Mat detections = m_net.forward();
+
+        // Runs the forward pass to get output of the output layers
+        std::vector<cv::Mat> outs;
+        m_net.forward(outs, getOutputsNames(m_net));
+        // Remove the bounding boxes with low confidence
         cv::Mat dec(detections.size[2], detections.size[3], CV_32F, detections.ptr<float>());
         float confidence;
         std::string label;
@@ -231,6 +247,92 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
     qPainter.end();
 }
 
+void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
+    cv::Mat frame = QImageToCvMat(image);
+    // Setup a rectangle to define your region of interest
+    cv::Rect myROI(leftCrop, 0, 1280 - leftCrop - rightCrop, 720);
+
+    // Crop the full image to that image contained by the rectangle myROI
+    cv::Mat croppedFrame = frame(myROI);
+    cv::Mat bgr;    // for opencv
+    cv::cvtColor(croppedFrame, bgr, cv::COLOR_RGBA2BGR);
+    cv::Mat rgb;    // for dlib
+    cv::cvtColor(croppedFrame, rgb, cv::COLOR_RGBA2RGB);
+    dlib::array2d<dlib::bgr_pixel> dlibImage;
+    dlib::assign_image(dlibImage, dlib::cv_image<dlib::bgr_pixel>(bgr));
+
+    QPainter qPainter(&image);
+    qPainter.setBrush(Qt::NoBrush);
+    qPainter.setPen(Qt::red);
+    qPainter.drawRect(leftCrop, 0, 1280 - leftCrop - rightCrop, 720);
+    if (m_frameCount % 20 == 0) {
+        // Create a 3D blob from a frame.
+        cv::Mat blob;
+        cv::dnn::blobFromImage(bgr, blob, 1/255.0, cvSize(inpWidth, inpHeight), cv::Scalar(0,0,0), false, false);
+//        std::cout << blob.size << std::endl;
+        m_net.setInput(blob);
+
+        // Runs the forward pass to get output of the output layers
+        std::vector<cv::Mat> outs;
+        m_net.forward(outs, getOutputsNames(m_net));
+        // Remove the bounding boxes with low confidence
+        std::vector<std::tuple<cv::Rect, int, float>> res = postprocess(bgr, outs);
+
+        for (size_t i = 0; i < res.size(); i++) {
+            cv::Rect box = std::get<0>(res[i]);
+            std::string label = m_classes[std::get<1>(res[i])];
+            float confidence = std::get<2>(res[i]);
+            // extract the index of the class label from the detections list
+            if (label != "bus" && label != "truck") continue;
+
+            // If the centre of one box is inside another box, we consider them the same
+            // object. Will using IOU give a better result? This sound like a classic
+            // problem, sure someone must have done a research about it
+
+            // can we do this with the box NMS thingy???
+            bool tracked = false;
+            dlib::rectangle pos;
+            long xMean, yMean;
+            for (auto tracker: m_trackers) {
+                pos = tracker.get_position();
+                xMean = (pos.left() + pos.right()) / 2;
+                yMean = (pos.top() + pos.bottom()) / 2;
+                if (box.x < xMean && xMean < box.x + box.width && box.y < yMean && yMean < box.y + box.height) {
+                    tracked = true;
+                    break;
+                }
+                // Hmm shall we check the other way as well??
+            }
+            if (!tracked) {
+                dlib::correlation_tracker tracker = dlib::correlation_tracker();
+                dlib::rectangle rect = dlib::rectangle(box.x, box.y, box.x + box.width, box.y + box.height);
+                tracker.start_track(dlibImage, rect);
+                m_trackers.push_back(tracker);
+                m_labels.push_back(std::to_string(m_trackers.size() - 1));
+                // put back the crop offset before we draw
+                qPainter.drawRect(box.x + leftCrop, box.y, box.width, box.height);
+                qPainter.drawText(box.x + leftCrop, box.y, QString::number(m_trackers.size() - 1));
+            }
+        }
+    }
+    else {
+    int xStart, xEnd, yStart, yEnd;
+    for (size_t i = 0; i < m_trackers.size(); i++) {
+        m_trackers[i].update(dlibImage);
+        dlib::rectangle pos = m_trackers[i].get_position();
+        // unpack the position object
+        xStart = int(pos.left());
+        yStart = int(pos.top());
+        xEnd = int(pos.right());
+        yEnd = int(pos.bottom());
+        // put back the crop offset before we draw
+        qPainter.drawRect(xStart + leftCrop, yStart, xEnd - xStart, yEnd - yStart);
+        qPainter.drawText(xStart + leftCrop, yStart, QString::fromStdString(m_labels[i]));
+    }
+    }
+    qPainter.end();
+}
+
 cv::Mat MyVideoFilterRunnable::QImageToCvMat(const QImage &inImage, bool inCloneImageData) {
     switch (inImage.format()) {
      // 8-bit, 4 channel
@@ -296,4 +398,68 @@ cv::Mat MyVideoFilterRunnable::QImageToCvMat(const QImage &inImage, bool inClone
     }
 
     return cv::Mat();
+}
+
+// Remove the bounding boxes with low confidence using non-maxima suppression
+std::vector<std::tuple<cv::Rect, int, float>> MyVideoFilterRunnable::postprocess(cv::Mat& frame, const std::vector<cv::Mat>& outs) {
+    std::vector<int> classIds;
+    std::vector<float> confidences;
+    std::vector<cv::Rect> boxes;
+
+    for (size_t i = 0; i < outs.size(); ++i) {
+        // Scan through all the bounding boxes output from the network and keep only the
+        // ones with high confidence scores. Assign the box's class label as the class
+        // with the highest score for the box.
+        float* data = (float*)outs[i].data;
+        for (int j = 0; j < outs[i].rows; ++j, data += outs[i].cols) {
+            cv::Mat scores = outs[i].row(j).colRange(5, outs[i].cols);
+            cv::Point classIdPoint;
+            double confidence;
+            // Get the value and location of the maximum score
+            minMaxLoc(scores, nullptr, &confidence, nullptr, &classIdPoint);
+            if (confidence > confThreshold) {
+                int centerX = (int)(data[0] * frame.cols);
+                int centerY = (int)(data[1] * frame.rows);
+                int width = (int)(data[2] * frame.cols);
+                int height = (int)(data[3] * frame.rows);
+                int left = centerX - width / 2;
+                int top = centerY - height / 2;
+
+                classIds.push_back(classIdPoint.x);
+                confidences.push_back((float)confidence);
+                boxes.push_back(cv::Rect(left, top, width, height));
+            }
+        }
+    }
+
+    // Perform non maximum suppression to eliminate redundant overlapping boxes with
+    // lower confidences
+    std::vector<int> indices;
+    cv::dnn::NMSBoxes(boxes, confidences, confThreshold, nmsThreshold, indices);
+    std::vector<std::tuple<cv::Rect, int, float>> res;
+    for (size_t i = 0; i < indices.size(); ++i) {
+        int idx = indices[i];
+//        cv::Rect box = boxes[idx];
+        res.push_back(std::make_tuple(boxes[idx], classIds[idx], confidences[idx]));
+//        drawPred(classIds[idx], confidences[idx], box.x, box.y, box.x + box.width, box.y + box.height, frame);
+    }
+    return res;
+}
+
+// Get the names of the output layers
+std::vector<std::string> MyVideoFilterRunnable::getOutputsNames(const cv::dnn::Net& net) {
+    static std::vector<std::string> names;
+    if (names.empty()) {
+        //Get the indices of the output layers, i.e. the layers with unconnected outputs
+        std::vector<int> outLayers = net.getUnconnectedOutLayers();
+
+        //get the names of all the layers in the network
+        std::vector<std::string> layersNames = net.getLayerNames();
+
+        // Get the names of the output layers in names
+        names.resize(outLayers.size());
+        for (size_t i = 0; i < outLayers.size(); ++i)
+        names[i] = layersNames[outLayers[i] - 1];
+    }
+    return names;
 }
