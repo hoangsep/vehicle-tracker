@@ -3,10 +3,9 @@ TARGET = videographicsitem
 
 QT += qml quick multimedia multimediawidgets
 
-HEADERS   += videoplayer.h \
+HEADERS   += \
     MyVideoFilter.h \
-    MyVideoFilterRunnable.h \
-    vehicle_tracker.h
+    MyVideoFilterRunnable.h
 
 INCLUDEPATH += /usr/local/include/opencv4
 LIBS += $(shell pkg-config opencv --libs)
@@ -16,9 +15,7 @@ PKGCONFIG += dlib-1
 
 SOURCES   += main.cpp \
              MyVideoFilter.cpp \
-             MyVideoFilterRunnable.cpp \
-             vehicle_tracker.cpp \
-             videoplayer.cpp
+             MyVideoFilterRunnable.cpp
 
 target.path = $$[QT_INSTALL_EXAMPLES]/multimediawidgets/videographicsitem
 INSTALLS += target

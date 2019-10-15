@@ -15,10 +15,19 @@ MyVideoFilterRunnable::MyVideoFilterRunnable(MyVideoFilter* parent) :
     m_Flip(0),
     m_frameCount(0)
 {
-    std::string prototxt = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.prototxt";
-    std::string model = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.caffemodel";
-    m_net = cv::dnn::readNetFromCaffe(prototxt, model);
+    std::string prototxt1 = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.prototxt";
+    std::string model1 = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.caffemodel";
+
+    std::string prototxt2 = "/home/mihota/vision/vehicle-tracker/videographicsitem/SSD_300x300_coco/deploy.prototxt";
+    std::string model2 = "/home/mihota/vision/vehicle-tracker/videographicsitem/SSD_300x300_coco/VGG_coco_SSD_300x300.caffemodel";
+
+    std::string prototxt3 = "/home/mihota/vision/vehicle-tracker/videographicsitem/SSD_300x300/deploy.prototxt";
+    std::string model3 = "/home/mihota/vision/vehicle-tracker/videographicsitem/SSD_300x300/VGG_coco_SSD_300x300_iter_400000.caffemodel";
+
+    m_net = cv::dnn::readNetFromCaffe(prototxt1, model1);
     std::cout << "Read net done" << std::endl;
+
+
 }
 
 QVideoFrame MyVideoFilterRunnable::run(QVideoFrame *input, const QVideoSurfaceFormat &surfaceFormat, RunFlags flags) {
@@ -121,21 +130,31 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
 
 //    cv::Mat frame(image.height(),image.width(),CV_8UC4, image.bits(), image.bytesPerLine());
     cv::Mat frame = QImageToCvMat(image);
+    // Setup a rectangle to define your region of interest
+    cv::Rect myROI(leftCrop, 0, 1280 - rightCrop, 720);
+
+    // Crop the full image to that image contained by the rectangle myROI
+    cv::Mat croppedFrame = frame(myROI);
+//    frame(myROI).copyTo(croppedFrame);
     cv::Mat bgr;
-    cv::cvtColor(frame, bgr, cv::COLOR_RGBA2BGR);
+    cv::cvtColor(croppedFrame, bgr, cv::COLOR_RGBA2BGR);
     dlib::array2d<dlib::bgr_pixel> dlibImage;
     dlib::assign_image(dlibImage, dlib::cv_image<dlib::bgr_pixel>(bgr));
+//    std::cout << dlibImage.size() << std::endl;
 
     // frame from BGR to RGB ordering (dlib needs RGB ordering)
     cv::Mat rgb;
-    cv::cvtColor(frame, rgb, cv::COLOR_RGBA2RGB);
+    cv::cvtColor(croppedFrame, rgb, cv::COLOR_RGBA2RGB);
+
     QPainter qPainter(&image);
     qPainter.setBrush(Qt::NoBrush);
     qPainter.setPen(Qt::red);
+    qPainter.drawRect(leftCrop, 0, 1280 - rightCrop, 720);
     int xStart, xEnd, yStart, yEnd;
-    if (m_frameCount % 5 == 0) {
+    if (m_frameCount % 20 == 0) {
         //    cv::resize(bgr, bgr, cv::Size(), 0.75, 0.75);
         cv::Mat blob = cv::dnn::blobFromImage(bgr, 2.0 / 255, cv::Size(bgr.size[1], bgr.size[0]), cv::Scalar(127.5, 127.5, 127.5), false);
+        std::cout << blob.size << std::endl;
         m_net.setInput(blob);
         cv::Mat detections = m_net.forward();
         cv::Mat dec(detections.size[2], detections.size[3], CV_32F, detections.ptr<float>());
@@ -151,7 +170,7 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
                 idx = int(detections.at<float>(i, 1));
                 if (idx < 0) continue;
                 label = CLASSES[idx];
-//                std::cout << idx << ":" << label << ":" << confidence << std::endl;
+                std::cout << idx << ":" << label << ":" << confidence << std::endl;
 
                 if (label != "car" && label != "bus") continue;
                 // compute the (x, y)-coordinates of the bounding box for the object
@@ -160,7 +179,7 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
                 xEnd = int(detections.at<float>(i, 5) * image.width());
                 yEnd = int(detections.at<float>(i, 6) * image.height());
 
-    //            std::cout << xStart << ":" << xEnd << "-" << yStart << ":" << yEnd << std::endl;
+                std::cout << xStart << ":" << xEnd << "-" << yStart << ":" << yEnd << std::endl;
 
                 // If the centre of one box is inside another box, we consider them the same
                 // object. Will using IOU give a better result? This sound like a classic
@@ -184,26 +203,30 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
                     tracker.start_track(dlibImage, rect);
                     m_trackers.push_back(tracker);
                     m_labels.push_back(std::to_string(m_trackers.size() - 1));
-                    qPainter.drawRect(xStart, yStart, xEnd - xStart, yEnd - yStart);
-                    qPainter.drawText(xStart, yStart, QString::number(m_trackers.size() - 1));
+                    // put back the crop offset before we draw
+                    qPainter.drawRect(xStart + leftCrop, yStart, xEnd - xStart, yEnd - yStart);
+                    qPainter.drawText(xStart + leftCrop, yStart, QString::number(m_trackers.size() - 1));
+
+
                 }
 
             }
         }
     }
-    else {
-        for (size_t i = 0; i < m_trackers.size(); i++) {
-            m_trackers[i].update(dlibImage);
-            dlib::rectangle pos = m_trackers[i].get_position();
-            // unpack the position object
-            xStart = int(pos.left());
-            yStart = int(pos.top());
-            xEnd = int(pos.right());
-            yEnd = int(pos.bottom());
-            qPainter.drawRect(xStart, yStart, xEnd - xStart, yEnd - yStart);
-            qPainter.drawText(xStart, yStart, QString::fromStdString(m_labels[i]));
-        }
+//    else {
+    for (size_t i = 0; i < m_trackers.size(); i++) {
+        m_trackers[i].update(dlibImage);
+        dlib::rectangle pos = m_trackers[i].get_position();
+        // unpack the position object
+        xStart = int(pos.left());
+        yStart = int(pos.top());
+        xEnd = int(pos.right());
+        yEnd = int(pos.bottom());
+        // put back the crop offset before we draw
+        qPainter.drawRect(xStart + leftCrop, yStart, xEnd - xStart, yEnd - yStart);
+        qPainter.drawText(xStart + leftCrop, yStart, QString::fromStdString(m_labels[i]));
     }
+//    }
 
     qPainter.end();
 }

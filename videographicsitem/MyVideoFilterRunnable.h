@@ -22,8 +22,9 @@ static std::string CLASSES[] = {"background", "aeroplane", "bicycle", "bird", "b
     "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
     "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
     "sofa", "train", "tvmonitor"};
-const float confidenceThreshold = 0.3f;
-
+const float confidenceThreshold = 0.4f;
+const long leftCrop = 0;
+const long rightCrop = 130;
 class MyVideoFilter;
 
 class MyVideoFilterRunnable : public QVideoFilterRunnable {
