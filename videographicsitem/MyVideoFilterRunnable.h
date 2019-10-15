@@ -27,7 +27,7 @@ const long leftCrop = 500;
 const long rightCrop = 130;
 
 // Initialize the parameters
-const double confThreshold = 0.7; // Confidence threshold
+const double confThreshold = 0.6; // Confidence threshold
 const float nmsThreshold = 0.4;  // Non-maximum suppression threshold
 const int inpWidth = 416;  // Width of network's input image
 const int inpHeight = 416; // Height of network's input image
@@ -51,18 +51,17 @@ public:
     // Remove the bounding boxes with low confidence using non-maxima suppression
     std::vector<std::tuple<cv::Rect, int, float>> postprocess(cv::Mat& frame, const std::vector<cv::Mat>& out);
 
-    // Draw the predicted bounding box
-//    void drawPred(int classId, float conf, int left, int top, int right, int bottom, cv::Mat& frame);
-
     // Get the names of the output layers
     std::vector<std::string> getOutputsNames(const cv::dnn::Net& net);
 
+    float computeIOU(dlib::rectangle boxA, cv::Rect boxB);
 protected:
     MyVideoFilter* m_Filter;
     int m_Orientation;
     int m_Flip;
     std::vector<dlib::correlation_tracker> m_trackers;
     std::vector<std::string> m_labels;
+    std::vector<float> m_confidence;
     cv::dnn::Net m_net;
     unsigned long m_frameCount;
 

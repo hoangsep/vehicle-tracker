@@ -264,7 +264,7 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
     QPainter qPainter(&image);
     qPainter.setBrush(Qt::NoBrush);
     qPainter.setPen(Qt::red);
-    qPainter.drawRect(leftCrop, 0, 1280 - leftCrop - rightCrop, 720);
+//    qPainter.drawRect(leftCrop, 0, 1280 - leftCrop - rightCrop, 720);
     if (m_frameCount % 20 == 0) {
         // Create a 3D blob from a frame.
         cv::Mat blob;
@@ -286,22 +286,13 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
             if (label != "bus" && label != "truck") continue;
 
             // If the centre of one box is inside another box, we consider them the same
-            // object. Will using IOU give a better result? This sound like a classic
-            // problem, sure someone must have done a research about it
-
-            // can we do this with the box NMS thingy???
+            // object. TODO: Change to NMS
             bool tracked = false;
-            dlib::rectangle pos;
-            long xMean, yMean;
             for (auto tracker: m_trackers) {
-                pos = tracker.get_position();
-                xMean = (pos.left() + pos.right()) / 2;
-                yMean = (pos.top() + pos.bottom()) / 2;
-                if (box.x < xMean && xMean < box.x + box.width && box.y < yMean && yMean < box.y + box.height) {
+                if (computeIOU(tracker.get_position(), box) > 0.1) {
                     tracked = true;
                     break;
                 }
-                // Hmm shall we check the other way as well??
             }
             if (!tracked) {
                 dlib::correlation_tracker tracker = dlib::correlation_tracker();
@@ -309,13 +300,13 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
                 tracker.start_track(dlibImage, rect);
                 m_trackers.push_back(tracker);
                 m_labels.push_back(std::to_string(m_trackers.size() - 1));
+                m_confidence.push_back(confidence);
                 // put back the crop offset before we draw
                 qPainter.drawRect(box.x + leftCrop, box.y, box.width, box.height);
                 qPainter.drawText(box.x + leftCrop, box.y, QString::number(m_trackers.size() - 1));
             }
         }
     }
-    else {
     int xStart, xEnd, yStart, yEnd;
     for (size_t i = 0; i < m_trackers.size(); i++) {
         m_trackers[i].update(dlibImage);
@@ -328,7 +319,6 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
         // put back the crop offset before we draw
         qPainter.drawRect(xStart + leftCrop, yStart, xEnd - xStart, yEnd - yStart);
         qPainter.drawText(xStart + leftCrop, yStart, QString::fromStdString(m_labels[i]));
-    }
     }
     qPainter.end();
 }
@@ -432,6 +422,16 @@ std::vector<std::tuple<cv::Rect, int, float>> MyVideoFilterRunnable::postprocess
         }
     }
 
+    // throw in the tracked ones
+//    dlib::rectangle pos;
+//    for (size_t i = 0; i < m_trackers.size(); i++) {
+//        pos = m_trackers[i].get_position();
+//        boxes.push_back(cv::Rect(pos.left(), pos.top(),
+//                                 pos.right() - pos.left(),
+//                                 pos.bottom() -pos.top()));
+//        confidences.push_back(m_confidence[i]);
+//    }
+
     // Perform non maximum suppression to eliminate redundant overlapping boxes with
     // lower confidences
     std::vector<int> indices;
@@ -462,4 +462,34 @@ std::vector<std::string> MyVideoFilterRunnable::getOutputsNames(const cv::dnn::N
         names[i] = layersNames[outLayers[i] - 1];
     }
     return names;
+}
+
+float MyVideoFilterRunnable::computeIOU(dlib::rectangle boxA, cv::Rect boxB) {
+    // If one rectangle is on left side of other
+    if (boxA.left() > boxB.x + boxB.width || boxB.x > boxA.right()) return 0;
+
+    // If one rectangle is above other
+    if (boxA.top() > boxB.y + boxB.height || boxB.y > boxA.bottom()) return 0;
+
+    // determine the (x, y)-coordinates of the intersection rectangle
+    long xA = std::max(boxA.left(), (long)boxB.x);
+    long yA = std::max(boxA.top(), (long)boxB.y);
+    long xB = std::min(boxA.right(), (long)boxB.x + boxB.width);
+    long yB = std::min(boxA.bottom(), (long)boxB.y + boxB.height);
+
+    // compute the area of intersection rectangle
+    long interArea = std::max(0l, xB - xA + 1) * std::max(0l, yB - yA + 1);
+
+    // compute the area of both the prediction and ground-truth
+    // rectangles
+    long boxAArea = (boxA.right() - boxA.left() + 1) * (boxA.bottom() - boxA.top() + 1);
+    long boxBArea = (boxB.width + 1) * (boxB.height + 1);
+
+    // compute the intersection over union by taking the intersection
+    // area and dividing it by the sum of prediction + ground-truth
+    // areas - the interesection area
+    float iou = interArea / float(boxAArea + boxBArea - interArea);
+
+    // return the intersection over union value
+    return iou;
 }
