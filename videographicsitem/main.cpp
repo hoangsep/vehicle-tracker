@@ -47,10 +47,7 @@
 ** $QT_END_LICENSE$
 **
 ****************************************************************************/
-//#define CV_DNN_DONT_ADD_INLINE_NS
 
-#include "videoplayer.h"
-#include "vehicle_tracker.h"
 #include "MyVideoFilter.h"
 
 #include <string.h>
@@ -60,47 +57,7 @@
 #include <QQmlApplicationEngine>
 #include <QDir>
 
-//#include <opencv2/opencv.hpp>
-#include <opencv2/core.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/dnn.hpp>
-#include <opencv2/videoio.hpp>
-
-#include <dlib/image_processing.h>
-#include <dlib/gui_widgets.h>
-#include <dlib/image_io.h>
-#include <dlib/dir_nav.h>
-
-using namespace cv;
-using namespace dnn;
-
-int main(int argc, char **argv)
-{
-//    QApplication app(argc, argv);
-
-//    QCoreApplication::setApplicationName("Vehicle Tracker");
-//    QCoreApplication::setOrganizationName("QtProject");
-//    QCoreApplication::setApplicationVersion(QT_VERSION_STR);
-//    QCommandLineParser parser;
-//    parser.setApplicationDescription("Hakuna matata");
-//    parser.addHelpOption();
-//    parser.addVersionOption();
-//    parser.addPositionalArgument("url", "The URL to open.");
-//    parser.process(app);
-//    dlib::correlation_tracker tracker;
-
-//    VideoPlayer player;
-
-//    if (!parser.positionalArguments().isEmpty() && player.isPlayerAvailable()) {
-//        const QUrl url =
-//            QUrl::fromUserInput(parser.positionalArguments().constFirst(),
-//                                QDir::currentPath(), QUrl::AssumeLocalFile);
-//        player.load(url);
-//    }
-
-//    player.show();
-
+int main(int argc, char **argv) {
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     QGuiApplication app(argc, argv);
 

@@ -13,8 +13,7 @@ MyVideoFilterRunnable::MyVideoFilterRunnable(MyVideoFilter* parent) :
     m_Filter(parent),
     m_Orientation(0),
     m_Flip(0),
-    m_frameCount(0)
-{
+    m_frameCount(0) {
     std::string prototxt1 = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.prototxt";
     std::string model1 = "/home/mihota/vision/vehicle-tracker/videographicsitem/mobilenet_ssd/MobileNetSSD_deploy.caffemodel";
 
@@ -25,7 +24,6 @@ MyVideoFilterRunnable::MyVideoFilterRunnable(MyVideoFilter* parent) :
     std::string model3 = "/home/mihota/vision/vehicle-tracker/videographicsitem/SSD_300x300/VGG_coco_SSD_300x300_iter_400000.caffemodel";
 
 //    m_net = cv::dnn::readNetFromCaffe(prototxt1, model1);
-//    std::cout << "Read net done" << std::endl;
     // YOLO time --------------------------------------------------------------------
     // Load names of classes
     std::string folderName = "/home/mihota/vision/vehicle-tracker/videographicsitem/YOLO/";
@@ -67,17 +65,13 @@ QVideoFrame MyVideoFilterRunnable::run(QVideoFrame *input, const QVideoSurfaceFo
         image = image.convertToFormat(QImage::Format_ARGB32);
     }
 
-//    drawRedGreenPixels(image);
-//    drawTrackingInfo(image);
     drawTrackingInfoYOLO(image);
 
     return QVideoFrame(image);
 }
 
-QImage MyVideoFilterRunnable::QVideoFrameToQImage(QVideoFrame* input)
-{
-    switch (input->handleType())
-    {
+QImage MyVideoFilterRunnable::QVideoFrameToQImage(QVideoFrame* input) {
+    switch (input->handleType()) {
     case QAbstractVideoBuffer::NoHandle:
         return QVideoFrameToQImage_using_Qt_internals(input);
 
@@ -95,13 +89,11 @@ QImage MyVideoFilterRunnable::QVideoFrameToQImage(QVideoFrame* input)
     return QImage();
 }
 
-QImage MyVideoFilterRunnable::QVideoFrameToQImage_using_Qt_internals(QVideoFrame* input)
-{
+QImage MyVideoFilterRunnable::QVideoFrameToQImage_using_Qt_internals(QVideoFrame* input) {
     return qt_imageFromVideoFrame(*input);
 }
 
-QImage MyVideoFilterRunnable::QVideoFrameToQImage_using_GLTextureHandle(QVideoFrame* input)
-{
+QImage MyVideoFilterRunnable::QVideoFrameToQImage_using_GLTextureHandle(QVideoFrame* input) {
     QImage image(input->width(), input->height(), QImage::Format_ARGB32);
     GLuint textureId = static_cast<GLuint>(input->handle().toInt());
     QOpenGLContext* ctx = QOpenGLContext::currentContext();
@@ -117,33 +109,7 @@ QImage MyVideoFilterRunnable::QVideoFrameToQImage_using_GLTextureHandle(QVideoFr
     return image;
 }
 
-void MyVideoFilterRunnable::drawRedGreenPixels(QImage& image) {
-    auto bits = image.bits();
-    int bytesPerLine = image.bytesPerLine();
-    auto bytesPerPixel = bytesPerLine / image.width();
-    for (int y = 0; y < image.height() && y < 32; y++) {
-        unsigned char* line = bits + y * bytesPerLine;
-        auto leftPixel = line;
-        auto rightPixel = line + bytesPerLine - bytesPerPixel;
-        for (int x = 0; x < image.width() && x < 32; x++) {
-            leftPixel[0] = 0;
-            leftPixel[1] = 255;
-            leftPixel[2] = 0;
-            leftPixel += bytesPerPixel;
-            rightPixel[0] = 0;
-            rightPixel[1] = 0;
-            rightPixel[2] = 255;
-            rightPixel -= bytesPerPixel;
-        }
-    }
-}
-
 void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
-//    auto bits = image.bits();
-//    int bytesPerLine = image.bytesPerLine();
-//    auto bytesPerPixel = bytesPerLine / image.width();
-
-//    cv::Mat frame(image.height(),image.width(),CV_8UC4, image.bits(), image.bytesPerLine());
     cv::Mat frame = QImageToCvMat(image);
     // Setup a rectangle to define your region of interest
     cv::Rect myROI(leftCrop, 0, 1280 - rightCrop, 720);
@@ -229,7 +195,6 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
             }
         }
     }
-//    else {
     for (size_t i = 0; i < m_trackers.size(); i++) {
         m_trackers[i].update(dlibImage);
         dlib::rectangle pos = m_trackers[i].get_position();
@@ -242,7 +207,6 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
         qPainter.drawRect(xStart + leftCrop, yStart, xEnd - xStart, yEnd - yStart);
         qPainter.drawText(xStart + leftCrop, yStart, QString::fromStdString(m_labels[i]));
     }
-//    }
 
     qPainter.end();
 }
@@ -266,10 +230,8 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
     qPainter.setPen(Qt::red);
 //    qPainter.drawRect(leftCrop, 0, 1280 - leftCrop - rightCrop, 720);
     if (m_frameCount % 20 == 0) {
-        // Create a 3D blob from a frame.
         cv::Mat blob;
         cv::dnn::blobFromImage(bgr, blob, 1/255.0, cvSize(inpWidth, inpHeight), cv::Scalar(0,0,0), false, false);
-//        std::cout << blob.size << std::endl;
         m_net.setInput(blob);
 
         // Runs the forward pass to get output of the output layers
@@ -285,11 +247,10 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
             // extract the index of the class label from the detections list
             if (label != "bus" && label != "truck") continue;
 
-            // If the centre of one box is inside another box, we consider them the same
-            // object. TODO: Change to NMS
+            // calculate IOU to check if the object is tracked or not
             bool tracked = false;
             for (auto tracker: m_trackers) {
-                if (computeIOU(tracker.get_position(), box) > 0.1) {
+                if (computeIOU(tracker.get_position(), box) > 0.1f) {
                     tracked = true;
                     break;
                 }
@@ -300,7 +261,8 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
                 tracker.start_track(dlibImage, rect);
                 m_trackers.push_back(tracker);
                 m_labels.push_back(std::to_string(m_trackers.size() - 1));
-                m_confidence.push_back(confidence);
+                m_confidences.push_back(confidence);
+                m_counts.push_back(0);
                 // put back the crop offset before we draw
                 qPainter.drawRect(box.x + leftCrop, box.y, box.width, box.height);
                 qPainter.drawText(box.x + leftCrop, box.y, QString::number(m_trackers.size() - 1));
@@ -308,18 +270,21 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
         }
     }
     int xStart, xEnd, yStart, yEnd;
+    dlib::rectangle pos;
     for (size_t i = 0; i < m_trackers.size(); i++) {
         m_trackers[i].update(dlibImage);
-        dlib::rectangle pos = m_trackers[i].get_position();
+        pos = m_trackers[i].get_position();
         // unpack the position object
         xStart = int(pos.left());
         yStart = int(pos.top());
         xEnd = int(pos.right());
         yEnd = int(pos.bottom());
+
         // put back the crop offset before we draw
         qPainter.drawRect(xStart + leftCrop, yStart, xEnd - xStart, yEnd - yStart);
         qPainter.drawText(xStart + leftCrop, yStart, QString::fromStdString(m_labels[i]));
     }
+
     qPainter.end();
 }
 
@@ -422,16 +387,6 @@ std::vector<std::tuple<cv::Rect, int, float>> MyVideoFilterRunnable::postprocess
         }
     }
 
-    // throw in the tracked ones
-//    dlib::rectangle pos;
-//    for (size_t i = 0; i < m_trackers.size(); i++) {
-//        pos = m_trackers[i].get_position();
-//        boxes.push_back(cv::Rect(pos.left(), pos.top(),
-//                                 pos.right() - pos.left(),
-//                                 pos.bottom() -pos.top()));
-//        confidences.push_back(m_confidence[i]);
-//    }
-
     // Perform non maximum suppression to eliminate redundant overlapping boxes with
     // lower confidences
     std::vector<int> indices;
@@ -446,7 +401,6 @@ std::vector<std::tuple<cv::Rect, int, float>> MyVideoFilterRunnable::postprocess
     return res;
 }
 
-// Get the names of the output layers
 std::vector<std::string> MyVideoFilterRunnable::getOutputsNames(const cv::dnn::Net& net) {
     static std::vector<std::string> names;
     if (names.empty()) {
