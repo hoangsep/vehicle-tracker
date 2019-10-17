@@ -194,10 +194,7 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
                     // put back the crop offset before we draw
                     qPainter.drawRect(xStart + leftCrop, yStart, xEnd - xStart, yEnd - yStart);
                     qPainter.drawText(xStart + leftCrop, yStart, QString::number(m_trackers.size() - 1));
-
-
                 }
-
             }
         }
     }
@@ -234,8 +231,28 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
     QPainter qPainter(&image);
     qPainter.setBrush(Qt::NoBrush);
     qPainter.setPen(Qt::red);
+    dlib::rectangle pos;
 
-    if (m_frameCount % 20 == 0) {
+    // track the speed of detected vehicle
+    double distance;
+    double dx, dy;
+    if (m_frameCount % speedTrackPeriod == 0) {
+        for (size_t i = 0; i < m_trackers.size(); i++) {
+            pos = m_trackers[i].get_position();
+            dx = ((pos.left() + pos.right()) / 2.0) - m_centroids[i].first;
+            dy = ((pos.top() + pos.bottom()) / 2.0) - m_centroids[i].second;
+            distance = dx * dx + dy * dy;
+
+            if (distance < moveDistThreshold && m_startFrame[i] == 0) {
+                m_startFrame[i] = m_frameCount;
+            }
+
+            m_centroids[i].first = (pos.left() + pos.right()) / 2;
+            m_centroids[i].second = (pos.top() + pos.bottom()) / 2;
+        }
+    }
+
+    if (m_frameCount % objectDetectionPeriod == 0) {
         cv::Mat blob;
         cv::dnn::blobFromImage(bgr, blob, 1/255.0, cvSize(inpWidth, inpHeight),
                                cv::Scalar(0,0,0), false, false);
@@ -271,7 +288,8 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
                 m_trackers.push_back(tracker);
                 m_labels.push_back(std::to_string(m_trackers.size() - 1));
                 m_confidences.push_back(confidence);
-                m_startFrame.push_back(m_frameCount);
+                m_startFrame.push_back(0);
+                m_centroids.push_back(std::make_pair(box.x + (box.width / 2), box.y + (box.height / 2)));
                 // put back the crop offset before we draw
                 qPainter.drawRect(box.x + leftCrop, box.y, box.width, box.height);
                 qPainter.drawText(box.x + leftCrop, box.y,
@@ -280,7 +298,8 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
         }
     }
     int xStart, xEnd, yStart, yEnd;
-    dlib::rectangle pos;
+
+    QString infoStr;
     for (size_t i = 0; i < m_trackers.size(); i++) {
         m_trackers[i].update(dlibImage);
         pos = m_trackers[i].get_position();
@@ -292,11 +311,17 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
 
         // put back the crop offset before we draw
         qPainter.drawRect(xStart + leftCrop, yStart, xEnd - xStart, yEnd - yStart);
+        if (m_startFrame[i] == 0) {
+            infoStr = " moving";
+        }
+        else {
+            infoStr = " time " + QString::number((m_frameCount - m_startFrame[i]) / m_frameRate) + "s";
+        }
         qPainter.drawText(xStart + leftCrop, yStart, "ID: "
-                          + QString::fromStdString(m_labels[i]) + " time "
-                          + QString::number((m_frameCount - m_startFrame[i]) / m_frameRate)
-                          + "s");
+                          + QString::fromStdString(m_labels[i]) + infoStr);
     }
+
+
 
     qPainter.end();
 }

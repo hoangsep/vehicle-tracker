@@ -20,10 +20,14 @@ static std::string CLASSES[] = {"background", "aeroplane", "bicycle", "bird", "b
 const float confidenceThreshold = 0.4f;
 const long leftCrop = 500;
 const long rightCrop = 130;
-const float confThreshold = 0.6; // Confidence threshold
+const float confThreshold = 0.6f; // Confidence threshold
 const float nmsThreshold = 0.4f;  // Non-maximum suppression threshold
 const int inpWidth = 416;  // Width of network's input image
 const int inpHeight = 416; // Height of network's input image
+
+const int objectDetectionPeriod = 20;   // detect object each 20 frames
+const int speedTrackPeriod = 20;        // track object speed each 20 frames
+const double moveDistThreshold = 80;    // threshold to quantify if object is moving
 
 class MyVideoFilter;
 
@@ -118,19 +122,19 @@ protected:
     int m_Orientation;
     int m_Flip;
 
-    // This 4 vectors go together and the same index in each vector
+    // This 5 vectors go together and the same index in each vector
     // will refer to the same tracker
     // TODO: Make this into a class
-    std::vector<dlib::correlation_tracker> m_trackers;
-    std::vector<std::string> m_labels;
-    std::vector<float> m_confidences;
-    std::vector<std::pair<long, long>> m_centroids;
-    std::vector<unsigned long> m_startFrame;  // the number of frame this object has been here
+    std::vector<dlib::correlation_tracker> m_trackers;  // dlib tracker used to track trucks
+    std::vector<std::string> m_labels;                  // label of the tracker above
+    std::vector<float> m_confidences;                   // confidence of tracker above
+    std::vector<std::pair<long, long>> m_centroids;     // x and y of centroid of bounding box
+    std::vector<unsigned long> m_startFrame;            // start frame this truck has stopped
 
-    cv::dnn::Net m_net;
-    unsigned long m_frameCount;
-    std::vector<std::string> m_classes;
-    double m_frameRate;
+    cv::dnn::Net m_net;                 // the network used for detection
+    unsigned long m_frameCount;         // number of frame passed
+    std::vector<std::string> m_classes; // classes in object detector
+    double m_frameRate;                 // frame rate of the video
 };
 
 #endif

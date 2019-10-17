@@ -1,10 +1,12 @@
 # vehicle-tracker
-[Demo Video](https://youtu.be/1SusQ0bMgr8)
+[Demo Video](https://youtu.be/kf5vGxIsrzU)
 
 ### Summary
 This is a simple example on detect and track trucks using opencv and dlib on Qt. The idea is to have an object detector to detect the trucks, then using dlib correlation tracker to track the truck. This does not mean that dlib tracker is better than opencv tracker. I just happend to find some tutorials about the dlib tracker. The default object detector is the YOLO network trained on COCO dataset that I downloaded from the leanopencv tutorial.
 
 Every N frames, the object detector will be run and all detected and untracked trucks will be added to the track list. To check if a truck is tracked or not, the IOU of the newly detected truck bounding box and the existing tracked bounding boxes are calculated and compared to a threshold. If the calculated IOU higher than the threshold then the truck is consider tracked.
+
+Every M frames, the displacement of the bounding box of each truck is calculated. If the displacement is under a threshold, the truck is consider stopped and that particular frame will be noted down to calculate the waiting time of the truck.
 
 Every frames the tracked trucks are updated with the new frame.
 
@@ -28,8 +30,6 @@ SSD networks are included in the project but they are not working as expected so
 - [SSD](https://github.com/weiliu89/caffe/tree/ssd)
 
 ### TODO
-Add truck waiting time
-
 Add detection for when a truck leave the screen and clean up the tracker accordingly
 
 check why the SSD is not working as expected
