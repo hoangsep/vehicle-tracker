@@ -20,7 +20,7 @@ static std::string CLASSES[] = {"background", "aeroplane", "bicycle", "bird", "b
 const float confidenceThreshold = 0.4f;
 const long leftCrop = 500;
 const long rightCrop = 130;
-const double confThreshold = 0.6; // Confidence threshold
+const float confThreshold = 0.6; // Confidence threshold
 const float nmsThreshold = 0.4f;  // Non-maximum suppression threshold
 const int inpWidth = 416;  // Width of network's input image
 const int inpHeight = 416; // Height of network's input image
@@ -125,11 +125,12 @@ protected:
     std::vector<std::string> m_labels;
     std::vector<float> m_confidences;
     std::vector<std::pair<long, long>> m_centroids;
-    std::vector<long> m_counts;  // the number of frame this object has been here
+    std::vector<unsigned long> m_startFrame;  // the number of frame this object has been here
 
     cv::dnn::Net m_net;
     unsigned long m_frameCount;
     std::vector<std::string> m_classes;
+    double m_frameRate;
 };
 
 #endif

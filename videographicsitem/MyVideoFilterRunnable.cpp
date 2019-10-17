@@ -42,13 +42,17 @@ MyVideoFilterRunnable::MyVideoFilterRunnable(MyVideoFilter* parent) :
     m_net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
 }
 
-QVideoFrame MyVideoFilterRunnable::run(QVideoFrame *input, const QVideoSurfaceFormat &surfaceFormat, RunFlags flags) {
+QVideoFrame MyVideoFilterRunnable::run(QVideoFrame *input,
+                                       const QVideoSurfaceFormat &surfaceFormat,
+                                       RunFlags flags) {
     Q_UNUSED(flags)
 
     if (!input->isValid()) {
         qWarning("Invalid input format");
         return *input;
     }
+
+    m_frameRate = surfaceFormat.frameRate();
 
     m_frameCount++;
 
@@ -103,8 +107,10 @@ QImage MyVideoFilterRunnable::QVideoFrameToQImage_using_GLTextureHandle(QVideoFr
     GLint prevFbo;
     f->glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
     f->glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    f->glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureId, 0);
-    f->glReadPixels(0, 0, input->width(), input->height(), GL_RGBA, GL_UNSIGNED_BYTE, image.bits());
+    f->glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                              GL_TEXTURE_2D, textureId, 0);
+    f->glReadPixels(0, 0, input->width(), input->height(),
+                    GL_RGBA, GL_UNSIGNED_BYTE, image.bits());
     f->glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(prevFbo));
     return image;
 }
@@ -131,7 +137,10 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
     qPainter.drawRect(leftCrop, 0, 1280 - rightCrop, 720);
     int xStart, xEnd, yStart, yEnd;
     if (m_frameCount % 20 == 0) {
-        cv::Mat blob = cv::dnn::blobFromImage(bgr, 2.0 / 255, cv::Size(bgr.size[1], bgr.size[0]), cv::Scalar(127.5, 127.5, 127.5), false);
+        cv::Mat blob = cv::dnn::blobFromImage(bgr, 2.0 / 255,
+                                              cv::Size(bgr.size[1], bgr.size[0]),
+                                              cv::Scalar(127.5, 127.5, 127.5),
+                                              false);
         m_net.setInput(blob);
         cv::Mat detections = m_net.forward();
 
@@ -152,7 +161,6 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
                 idx = int(detections.at<float>(i, 1));
                 if (idx < 0) continue;
                 label = CLASSES[idx];
-                std::cout << idx << ":" << label << ":" << confidence << std::endl;
 
                 if (label != "car" && label != "bus") continue;
                 // compute the (x, y)-coordinates of the bounding box for the object
@@ -160,8 +168,6 @@ void MyVideoFilterRunnable::drawTrackingInfo(QImage& image) {
                 yStart = int(detections.at<float>(i, 4) * image.height());
                 xEnd = int(detections.at<float>(i, 5) * image.width());
                 yEnd = int(detections.at<float>(i, 6) * image.height());
-
-                std::cout << xStart << ":" << xEnd << "-" << yStart << ":" << yEnd << std::endl;
 
                 // If the centre of one box is inside another box, we consider them the same
                 // object. Will using IOU give a better result? This sound like a classic
@@ -228,10 +234,11 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
     QPainter qPainter(&image);
     qPainter.setBrush(Qt::NoBrush);
     qPainter.setPen(Qt::red);
-//    qPainter.drawRect(leftCrop, 0, 1280 - leftCrop - rightCrop, 720);
+
     if (m_frameCount % 20 == 0) {
         cv::Mat blob;
-        cv::dnn::blobFromImage(bgr, blob, 1/255.0, cvSize(inpWidth, inpHeight), cv::Scalar(0,0,0), false, false);
+        cv::dnn::blobFromImage(bgr, blob, 1/255.0, cvSize(inpWidth, inpHeight),
+                               cv::Scalar(0,0,0), false, false);
         m_net.setInput(blob);
 
         // Runs the forward pass to get output of the output layers
@@ -242,7 +249,7 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
 
         for (size_t i = 0; i < res.size(); i++) {
             cv::Rect box = std::get<0>(res[i]);
-            std::string label = m_classes[std::get<1>(res[i])];
+            std::string label = m_classes[size_t(std::get<1>(res[i]))];
             float confidence = std::get<2>(res[i]);
             // extract the index of the class label from the detections list
             if (label != "bus" && label != "truck") continue;
@@ -257,15 +264,18 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
             }
             if (!tracked) {
                 dlib::correlation_tracker tracker = dlib::correlation_tracker();
-                dlib::rectangle rect = dlib::rectangle(box.x, box.y, box.x + box.width, box.y + box.height);
+                dlib::rectangle rect = dlib::rectangle(box.x, box.y,
+                                                       box.x + box.width,
+                                                       box.y + box.height);
                 tracker.start_track(dlibImage, rect);
                 m_trackers.push_back(tracker);
                 m_labels.push_back(std::to_string(m_trackers.size() - 1));
                 m_confidences.push_back(confidence);
-                m_counts.push_back(0);
+                m_startFrame.push_back(m_frameCount);
                 // put back the crop offset before we draw
                 qPainter.drawRect(box.x + leftCrop, box.y, box.width, box.height);
-                qPainter.drawText(box.x + leftCrop, box.y, QString::number(m_trackers.size() - 1));
+                qPainter.drawText(box.x + leftCrop, box.y,
+                                  QString::number(m_trackers.size() - 1));
             }
         }
     }
@@ -282,7 +292,10 @@ void MyVideoFilterRunnable::drawTrackingInfoYOLO(QImage& image) {
 
         // put back the crop offset before we draw
         qPainter.drawRect(xStart + leftCrop, yStart, xEnd - xStart, yEnd - yStart);
-        qPainter.drawText(xStart + leftCrop, yStart, QString::fromStdString(m_labels[i]));
+        qPainter.drawText(xStart + leftCrop, yStart, "ID: "
+                          + QString::fromStdString(m_labels[i]) + " time "
+                          + QString::number((m_frameCount - m_startFrame[i]) / m_frameRate)
+                          + "s");
     }
 
     qPainter.end();
@@ -356,7 +369,8 @@ cv::Mat MyVideoFilterRunnable::QImageToCvMat(const QImage &inImage, bool inClone
 }
 
 // Remove the bounding boxes with low confidence using non-maxima suppression
-std::vector<std::tuple<cv::Rect, int, float>> MyVideoFilterRunnable::postprocess(cv::Mat& frame, const std::vector<cv::Mat>& outs) {
+std::vector<std::tuple<cv::Rect, int, float>> MyVideoFilterRunnable::postprocess(cv::Mat& frame,
+                                                                                 const std::vector<cv::Mat>& outs) {
     std::vector<int> classIds;
     std::vector<float> confidences;
     std::vector<cv::Rect> boxes;
@@ -365,23 +379,23 @@ std::vector<std::tuple<cv::Rect, int, float>> MyVideoFilterRunnable::postprocess
         // Scan through all the bounding boxes output from the network and keep only the
         // ones with high confidence scores. Assign the box's class label as the class
         // with the highest score for the box.
-        float* data = (float*)outs[i].data;
+        float* data = (float*)(outs[i].data);
         for (int j = 0; j < outs[i].rows; ++j, data += outs[i].cols) {
             cv::Mat scores = outs[i].row(j).colRange(5, outs[i].cols);
             cv::Point classIdPoint;
             double confidence;
             // Get the value and location of the maximum score
             minMaxLoc(scores, nullptr, &confidence, nullptr, &classIdPoint);
-            if (confidence > confThreshold) {
-                int centerX = (int)(data[0] * frame.cols);
-                int centerY = (int)(data[1] * frame.rows);
-                int width = (int)(data[2] * frame.cols);
-                int height = (int)(data[3] * frame.rows);
+            if (confidence > double(confThreshold)) {
+                int centerX = int(data[0] * frame.cols);
+                int centerY = int(data[1] * frame.rows);
+                int width = int(data[2] * frame.cols);
+                int height = int(data[3] * frame.rows);
                 int left = centerX - width / 2;
                 int top = centerY - height / 2;
 
                 classIds.push_back(classIdPoint.x);
-                confidences.push_back((float)confidence);
+                confidences.push_back(float(confidence));
                 boxes.push_back(cv::Rect(left, top, width, height));
             }
         }
@@ -393,10 +407,8 @@ std::vector<std::tuple<cv::Rect, int, float>> MyVideoFilterRunnable::postprocess
     cv::dnn::NMSBoxes(boxes, confidences, confThreshold, nmsThreshold, indices);
     std::vector<std::tuple<cv::Rect, int, float>> res;
     for (size_t i = 0; i < indices.size(); ++i) {
-        int idx = indices[i];
-//        cv::Rect box = boxes[idx];
+        size_t idx = size_t(indices[i]);
         res.push_back(std::make_tuple(boxes[idx], classIds[idx], confidences[idx]));
-//        drawPred(classIds[idx], confidences[idx], box.x, box.y, box.x + box.width, box.y + box.height, frame);
     }
     return res;
 }
@@ -413,7 +425,7 @@ std::vector<std::string> MyVideoFilterRunnable::getOutputsNames(const cv::dnn::N
         // Get the names of the output layers in names
         names.resize(outLayers.size());
         for (size_t i = 0; i < outLayers.size(); ++i)
-        names[i] = layersNames[outLayers[i] - 1];
+        names[i] = layersNames[size_t(outLayers[i] - 1)];
     }
     return names;
 }
@@ -426,10 +438,10 @@ float MyVideoFilterRunnable::computeIOU(dlib::rectangle boxA, cv::Rect boxB) {
     if (boxA.top() > boxB.y + boxB.height || boxB.y > boxA.bottom()) return 0;
 
     // determine the (x, y)-coordinates of the intersection rectangle
-    long xA = std::max(boxA.left(), (long)boxB.x);
-    long yA = std::max(boxA.top(), (long)boxB.y);
-    long xB = std::min(boxA.right(), (long)boxB.x + boxB.width);
-    long yB = std::min(boxA.bottom(), (long)boxB.y + boxB.height);
+    long xA = std::max(boxA.left(), long(boxB.x));
+    long yA = std::max(boxA.top(), long(boxB.y));
+    long xB = std::min(boxA.right(), long(boxB.x + boxB.width));
+    long yB = std::min(boxA.bottom(), long(boxB.y + boxB.height));
 
     // compute the area of intersection rectangle
     long interArea = std::max(0l, xB - xA + 1) * std::max(0l, yB - yA + 1);
